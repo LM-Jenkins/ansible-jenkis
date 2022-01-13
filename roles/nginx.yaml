@@ -1,0 +1,105 @@
+---
+
+
+- hosts: nginx 
+  vars_files:
+      - vars/vars.yaml
+  become: true
+  tasks:
+  - name: yum update
+    yum:
+      update_cache: true
+      
+
+  - name: "install nginx"
+    yum:
+      name: ['nginx']
+      state: latest
+
+  - name: create www directory
+    file:
+      path: /var/www/{{ item }}
+      state: directory
+      mode: '0775'
+      owner: "{{ nginx_user }}"
+      group: "{{ nginx_user }}"
+    loop: 
+      - "{{ site1 }}"
+      - "{{ site2 }}"
+
+  - name: copie index_site1.html
+    copy:
+      src: files/index_site1.html
+      dest: "/var/www/{{ site1 }}/index.html"
+      owner: "{{ nginx_user }}"
+      group: "{{ nginx_user }}"
+      mode: 0644
+
+  - name: copie index_site2.html
+    copy:
+      src: files/index_site2.html
+      dest: "/var/www/{{ site2 }}/index.html"
+      owner: "{{ nginx_user }}"
+      group: "{{ nginx_user }}"
+      mode: 0644
+
+  - name: serveur bloc file 
+    file:
+      path: /etc/nginx/{{ item }}
+      state: directory
+      mode: '0755'
+      owner: "{{ nginx_user }}"
+      group: "{{ nginx_user }}"
+    loop:
+      - "sites-available"
+      - "sites-enabled"
+
+
+  - name: delete default nginx site
+    file:
+      path: /etc/nginx/sites-enabled/default
+      state: absent
+    notify: restart nginx
+
+  - name: copy nginx site.conf
+    template:
+      src: httpd_site1.conf.j2
+      dest: /etc/nginx/sites-available/httpd_site1.conf
+      owner: "{{ nginx_user }}"
+      group: "{{ nginx_user }}"
+      mode: '0644'
+    notify: restart nginx
+
+  - name: copy nginx site.conf
+    template:
+      src: httpd_site2.conf.j2
+      dest: /etc/nginx/sites-available/httpd_site2.conf
+      owner: "{{ nginx_user }}"
+      group: "{{ nginx_user }}"
+      mode: '0644'
+    notify: restart nginx
+
+
+  - name: Create symbolic link
+    file:
+      src: /etc/nginx/sites-available/httpd_site1.conf
+      dest: /etc/nginx/sites-enabled/httpd_site1.conf
+      state: link
+    notify: restart nginx
+
+
+  - name: Create symbolic link
+    file:
+      src: /etc/nginx/sites-available/httpd_site2.conf
+      dest: /etc/nginx/sites-enabled/httpd_site2.conf
+      state: link
+    notify: restart nginx
+
+  handlers:
+    - name: restart nginx
+      service:
+        name: nginx
+        state: restarted
+
+
+
